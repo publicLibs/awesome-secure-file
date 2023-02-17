@@ -4,6 +4,7 @@
 package com.github.publicLibs.awesome.securefile;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
@@ -32,6 +33,11 @@ public final class SecureFileUtils {
 		final Path file = fileInput.normalize().toAbsolutePath();
 		createSecureDir(file.getParent(), false);
 		Files.createFile(file, attrFiles);
+	}
+
+	public static OutputStream createSecureFileOutputStream(final Path fileInput) throws IOException {
+		createSecureFile(fileInput);
+		return Files.newOutputStream(fileInput);
 	}
 
 	private SecureFileUtils() {
