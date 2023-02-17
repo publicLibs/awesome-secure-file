@@ -22,13 +22,15 @@ public final class SecureFileUtils {
 	static final Set<PosixFilePermission> permsFiles = PosixFilePermissions.fromString("rwx------");
 	static final FileAttribute<Set<PosixFilePermission>> attrFiles = PosixFilePermissions.asFileAttribute(permsFiles);
 
-	private static void createSecureDir(final Path parent) throws IOException {
-		Files.createDirectories(parent, attrDir);
+	public static void createSecureDir(final Path dir, final boolean always) throws IOException {
+		if (Files.notExists(dir) || always) {
+			Files.createDirectories(dir, attrDir);
+		}
 	}
 
 	public static void createSecureFile(final Path fileInput) throws IOException {
 		final Path file = fileInput.normalize().toAbsolutePath();
-		createSecureDir(file.getParent());
+		createSecureDir(file.getParent(), false);
 		Files.createFile(file, attrFiles);
 	}
 
