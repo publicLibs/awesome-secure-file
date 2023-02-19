@@ -17,17 +17,47 @@ import java.util.Set;
  * @date 2023-февраля-17 15:54:20
  */
 public final class SecureFileUtils {
+	static abstract class SecureData {
+		public final FileAttribute<Set<PosixFilePermission>> getAttrs() {
+			return PosixFilePermissions.asFileAttribute(getPerms());
+		}
 
-	static final Set<PosixFilePermission> permsDir = PosixFilePermissions.fromString("rwx------");
-	static final FileAttribute<Set<PosixFilePermission>> attrDir = PosixFilePermissions.asFileAttribute(permsDir);
-	static final Set<PosixFilePermission> permsFiles = PosixFilePermissions.fromString("rw-------");
-	static final FileAttribute<Set<PosixFilePermission>> attrFiles = PosixFilePermissions.asFileAttribute(permsFiles);
+		public final Set<PosixFilePermission> getPerms() {
+			return PosixFilePermissions.fromString(getPermString());
+		}
+
+		public abstract String getPermString();
+	}
+
+	static class SecureDirData extends SecureData {
+		private final static SecureDirData instance = new SecureDirData();
+
+		public static SecureDirData getInstance() {
+			return instance;
+		}
+
+		public @Override String getPermString() {
+			return "rwx------";
+		}
+	}
+
+	static class SecureFileData extends SecureData {
+		private static final SecureFileData instance = new SecureFileData();
+
+		public static SecureFileData getInstance() {
+			return instance;
+		}
+
+		public @Override String getPermString() {
+			return "rw-------";
+		}
+	}
 
 	public static void createOrFixSecureDir(final Path dir, final boolean always) throws IOException {
 		if (Files.notExists(dir) || always) {
-			Files.createDirectories(dir, attrDir);
+			Files.createDirectories(dir, SecureDirData.getInstance().getAttrs());
 		} else {
-			Files.setPosixFilePermissions(dir, permsDir);
+			Files.setPosixFilePermissions(dir, SecureDirData.getInstance().getPerms());
 		}
 	}
 
@@ -35,9 +65,9 @@ public final class SecureFileUtils {
 		final Path file = fileInput.normalize().toAbsolutePath();
 		createSecureDir(file.getParent(), false);
 		if (Files.notExists(file)) {
-			Files.createFile(file, attrFiles);
+			Files.createFile(file, SecureFileData.getInstance().getAttrs());
 		} else {
-			Files.setPosixFilePermissions(file, permsFiles);
+			Files.setPosixFilePermissions(file, SecureFileData.getInstance().getPerms());
 		}
 	}
 
@@ -49,37 +79,39 @@ public final class SecureFileUtils {
 		}
 		createOrFixSecureDir(dirInput, false);
 		int index = dirInput.getNameCount();
-		Path dir = dirInput.resolve(fileInput.getName(index));
-
+		Path tmpPath = dirInput.resolve(fileInput.getName(index));
 		final int fileNameCount = fileInput.getNameCount();
+
 		while (true) {
-			final int dirNameCount = dir.getNameCount();
+			final int dirNameCount = tmpPath.getNameCount();
+
 			if (dirNameCount == fileNameCount) {
-				if (Files.isSameFile(dir, fileInput)) {
-					if (Files.notExists(dir)) {
-						Files.createFile(dir, attrFiles);
+				if (Files.isSameFile(tmpPath, fileInput)) {
+					if (Files.notExists(tmpPath)) {
+						Files.createFile(tmpPath, SecureFileData.getInstance().getAttrs());
 					} else {
-						Files.setPosixFilePermissions(dir, permsFiles);
+						Files.setPosixFilePermissions(tmpPath, SecureFileData.getInstance().getPerms());
 					}
 					break;
 				}
 			}
-			createSecureDir(dir, true);
+
+			createSecureDir(tmpPath, true);
 			index++;
-			dir = dir.resolve(fileInput.getName(index));
+			tmpPath = tmpPath.resolve(fileInput.getName(index));
 		}
 	}
 
 	public static void createSecureDir(final Path dir, final boolean always) throws IOException {
 		if (Files.notExists(dir) || always) {
-			Files.createDirectories(dir, attrDir);
+			Files.createDirectories(dir, SecureDirData.getInstance().getAttrs());
 		}
 	}
 
 	public static void createSecureFile(final Path fileInput) throws IOException {
 		final Path file = fileInput.normalize().toAbsolutePath();
 		createSecureDir(file.getParent(), false);
-		Files.createFile(file, attrFiles);
+		Files.createFile(file, SecureFileData.getInstance().getAttrs());
 	}
 
 	public static OutputStream createSecureFileOutputStream(final Path fileInput) throws IOException {
